@@ -1,4 +1,5 @@
 jupyter
 pyairtable
+tqdm
 python-dotenv
 pandas
