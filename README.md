@@ -11,7 +11,7 @@ pip3 install -r requirements.txt
 
 ### Cron Job
 ```
-* /10 * * * * jupyter nbconvert --ExecutePreprocessor.timeout=600 --to pdf --execute /home/stephen/personal_productivity/airtable_tools_v2.ipynb 
+*/10 * * * * jupyter nbconvert --ExecutePreprocessor.timeout=600 --to pdf --execute /home/stephen/personal_productivity/airtable_tools_v2.ipynb 
 ```
 
 
