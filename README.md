@@ -4,6 +4,7 @@
 ```
 sudo apt-get install texlive texlive-latex-extra pandoc
 sudo apt-get install texline-xetex texlive-fonts-recommended texlive-plain-generic
+pip3 install -r requirements.txt
 ```
 ### Other Setup
 - Tab Reloader Firefox add on by James Fray
