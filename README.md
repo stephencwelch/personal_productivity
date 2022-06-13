@@ -17,6 +17,8 @@ jupyter nbconvert --to script nbs/airtable_tools_v2.ipynb
 ```
 */10 * * * * python3 /home/stephen/personal_productivity/nbs/airtable_tools_v2.py >> /tmp/personal_productivity_script.log 2>&1
 ```
-
+```
+tail /tmp/personal_productivity_script.log -f
+```
 
 ### Conventions
