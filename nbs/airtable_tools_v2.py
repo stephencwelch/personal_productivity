@@ -3,7 +3,7 @@
 
 # ## airtable_tools_v2
 
-# In[1]:
+# In[3]:
 
 
 import os, logging
@@ -16,7 +16,7 @@ from datetime import datetime
 import pytz
 
 
-# In[2]:
+# In[4]:
 
 
 logging.basicConfig(format='[%(asctime)s] p%(process)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
@@ -25,7 +25,7 @@ logger=logging.getLogger(__name__)
 logger.setLevel('INFO')
 
 
-# In[3]:
+# In[5]:
 
 
 load_dotenv()
@@ -284,38 +284,162 @@ for s in df['Goal'].unique():
 res=a.batch_create(l)
 
 
-# ## Personal Development
+# ## Goal/Habit Tracking
 # - Can I make this super general so I can visualize any goal over time?
 # - Pausing here for now -> key pieces are deployed, can contineue to improve over time, but let's get this thing live!!
 
-# In[ ]:
+# In[44]:
 
 
+dst_table_name='[A]Habits'
 
 
-
-# In[ ]:
-
+# In[45]:
 
 
+logger.info('Connecting to Log, Habits, and Goal table...')
+log_table=Table(api_key, base_id, 'Log')
+habit_table=Table(api_key, base_id, 'Habits')
+goal_table=Table(api_key, base_id, 'Goals')
+
+logger.info('Connecting to %s table...', dst_table_name)
+a=Table(api_key, base_id, dst_table_name)
 
 
-# In[ ]:
+# In[54]:
 
 
+logger.info('Finding Personal Development Logs without "Log" in name')
+res=[]
+for o in tqdm(log_table.all()):
+    if 'fields' not in o: continue
+    if 'Habit' not in o['fields']: continue
+    if 'Goal 2' not in o['fields']: continue
+    if len(o['fields']['Goal 2'])>0:
+        goal=goal_table.get(o['fields']['Goal 2'][0])
+        habit=habit_table.get(o['fields']['Habit'][0])
+        if 'fields' not in goal: continue
+        if 'Goal' not in goal['fields']: continue
+        if 'Log' in habit['fields']['Habit']: continue
+        d={'Date':o['fields']['Date'], 'Habit': habit['fields']['Habit'], 'Goal':goal['fields']['Goal']}
+        if 'Minutes' in o['fields']: d['Minutes']=o['fields']['Minutes']
+        res.append(d)
 
 
-
-# In[ ]:
-
+# In[55]:
 
 
+logger.info('Converting to dataframe and resampling...')
+df=pd.DataFrame(res)
+df.index=pd.DatetimeIndex(df['Date'])
+df=df.sort_index()
+dfr=df.resample('D').sum() #Resample
+
+logger.info('Deleting existing %s data..', dst_table_name)
+r=a.all()
+ids=[o['id'] for o in r]
+res=a.batch_delete(ids)
 
 
-# In[ ]:
+# In[56]:
 
 
+end_date=pd.datetime.now()
+if end_date not in dfr.index: #Do we have data from today?
+    dfr.loc[end_date]=0 #Add 0s at todays date
+    dfr=dfr.resample('D').sum()
 
+
+# In[57]:
+
+
+logger.info('Computing cumulative sums by type...')
+
+for s in df['Habit'].unique(): dfr['Minutes_'+s]=df[df['Habit']==s]['Minutes'].resample('D').sum()
+dfr=dfr.replace(np.NaN, 0)
+for s in df['Habit'].unique(): dfr['Minutes_Cumulative_'+s]=dfr['Minutes_'+s].cumsum()
+
+
+# In[67]:
+
+
+logger.info('Uploading new analytics data...')
+l=[]
+for s in df['Habit'].unique():
+    for d in dfr.index:
+        l.append({'Date': str(d.date()),
+                  'Goal': df[df['Habit']==s]['Goal'].iloc[0],
+                  'Minutes': dfr.loc[d]['Minutes_'+s],
+                  'Minutes Cumulative': dfr.loc[d]['Minutes_Cumulative_'+s],
+                  'Habit': s})
+res=a.batch_create(l)
+
+
+# ## References
+
+# In[146]:
+
+
+dst_table_name='[A]References'
+
+
+# In[147]:
+
+
+logger.info('Connecting to Log, Habits, and Goal table...')
+references_table=Table(api_key, base_id, 'References')
+
+logger.info('Connecting to %s table...', dst_table_name)
+a=Table(api_key, base_id, dst_table_name)
+
+
+# In[148]:
+
+
+logger.info('Deleting existing %s data..', dst_table_name)
+r=a.all()
+ids=[o['id'] for o in r]
+res=a.batch_delete(ids)
+
+
+# In[149]:
+
+
+logger.info('Finding references data...')
+res=[]
+for o in tqdm(references_table.all()):
+    res.append({'Date':o['createdTime'], 'Refs':1})
+
+
+# In[150]:
+
+
+df=pd.DataFrame(res)
+df.index=pd.DatetimeIndex(df['Date'])
+df=df.sort_index()
+dfr=df.resample('D').sum() #Resample
+
+
+# In[151]:
+
+
+end_date=pd.datetime.now(tz=pytz.timezone('UTC'))
+if end_date not in dfr.index: #Do we have data from today?
+    dfr.loc[end_date]=0 #Add 0s at todays date
+    dfr=dfr.resample('D').sum()
+
+
+# In[152]:
+
+
+dfr['Refs Cumulative']=dfr['Refs'].cumsum()
+dfr['Date']=[str(dfr.index[i].date()) for i in range(len(dfr))]
+
+
+# In[153]:
+
+
+res=a.batch_create(dfr.to_dict(orient='Records'))
 
 
 # In[ ]:
