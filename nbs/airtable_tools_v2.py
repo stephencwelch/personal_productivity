@@ -3,11 +3,12 @@
 
 # ## airtable_tools_v2
 
-# In[3]:
+# In[1]:
 
 
 import os, logging
 import numpy as np
+
 from tqdm import tqdm
 import pandas as pd
 from pyairtable import Table
@@ -16,7 +17,7 @@ from datetime import datetime
 import pytz
 
 
-# In[4]:
+# In[2]:
 
 
 logging.basicConfig(format='[%(asctime)s] p%(process)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
@@ -25,7 +26,7 @@ logger=logging.getLogger(__name__)
 logger.setLevel('INFO')
 
 
-# In[5]:
+# In[3]:
 
 
 load_dotenv()
@@ -60,6 +61,7 @@ res=[]
 for o in tqdm(log_table.all()):
     if 'fields' not in o: continue
     if 'Habit' not in o['fields']: continue
+    if 'Score' not in o['fields']: continue
     if len(o['fields']['Habit'])>0:
         habit=habit_table.get(o['fields']['Habit'][0])
         if 'Log' in habit['fields']['Habit']:
@@ -288,13 +290,13 @@ res=a.batch_create(l)
 # - Can I make this super general so I can visualize any goal over time?
 # - Pausing here for now -> key pieces are deployed, can contineue to improve over time, but let's get this thing live!!
 
-# In[44]:
+# In[23]:
 
 
 dst_table_name='[A]Habits'
 
 
-# In[45]:
+# In[24]:
 
 
 logger.info('Connecting to Log, Habits, and Goal table...')
@@ -306,7 +308,7 @@ logger.info('Connecting to %s table...', dst_table_name)
 a=Table(api_key, base_id, dst_table_name)
 
 
-# In[54]:
+# In[25]:
 
 
 logger.info('Finding Personal Development Logs without "Log" in name')
@@ -326,7 +328,7 @@ for o in tqdm(log_table.all()):
         res.append(d)
 
 
-# In[55]:
+# In[26]:
 
 
 logger.info('Converting to dataframe and resampling...')
@@ -341,7 +343,7 @@ ids=[o['id'] for o in r]
 res=a.batch_delete(ids)
 
 
-# In[56]:
+# In[27]:
 
 
 end_date=pd.datetime.now()
@@ -350,7 +352,7 @@ if end_date not in dfr.index: #Do we have data from today?
     dfr=dfr.resample('D').sum()
 
 
-# In[57]:
+# In[28]:
 
 
 logger.info('Computing cumulative sums by type...')
@@ -360,7 +362,7 @@ dfr=dfr.replace(np.NaN, 0)
 for s in df['Habit'].unique(): dfr['Minutes_Cumulative_'+s]=dfr['Minutes_'+s].cumsum()
 
 
-# In[67]:
+# In[29]:
 
 
 logger.info('Uploading new analytics data...')
@@ -377,13 +379,13 @@ res=a.batch_create(l)
 
 # ## References
 
-# In[146]:
+# In[30]:
 
 
 dst_table_name='[A]References'
 
 
-# In[147]:
+# In[31]:
 
 
 logger.info('Connecting to Log, Habits, and Goal table...')
@@ -393,7 +395,7 @@ logger.info('Connecting to %s table...', dst_table_name)
 a=Table(api_key, base_id, dst_table_name)
 
 
-# In[148]:
+# In[33]:
 
 
 logger.info('Deleting existing %s data..', dst_table_name)
@@ -402,7 +404,7 @@ ids=[o['id'] for o in r]
 res=a.batch_delete(ids)
 
 
-# In[149]:
+# In[34]:
 
 
 logger.info('Finding references data...')
@@ -411,7 +413,7 @@ for o in tqdm(references_table.all()):
     res.append({'Date':o['createdTime'], 'Refs':1})
 
 
-# In[150]:
+# In[35]:
 
 
 df=pd.DataFrame(res)
@@ -420,7 +422,7 @@ df=df.sort_index()
 dfr=df.resample('D').sum() #Resample
 
 
-# In[151]:
+# In[36]:
 
 
 end_date=pd.datetime.now(tz=pytz.timezone('UTC'))
@@ -429,14 +431,14 @@ if end_date not in dfr.index: #Do we have data from today?
     dfr=dfr.resample('D').sum()
 
 
-# In[152]:
+# In[37]:
 
 
 dfr['Refs Cumulative']=dfr['Refs'].cumsum()
 dfr['Date']=[str(dfr.index[i].date()) for i in range(len(dfr))]
 
 
-# In[153]:
+# In[38]:
 
 
 res=a.batch_create(dfr.to_dict(orient='Records'))
